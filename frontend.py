@@ -37,6 +37,32 @@ def main():
                 st.subheader("Data Preview")
                 st.write(f"Dataset Shape: {df.shape[0]} rows and {df.shape[1]} columns")
                 st.dataframe(df.head())
+
+                # Dataset Quality Report (New Feature)
+                st.subheader("📊 Dataset Quality Report")
+                
+                # Using columns for a cleaner layout
+                q_col1, q_col2 = st.columns(2)
+                
+                with q_col1:
+                    st.write("**Missing Values:**")
+                    missing_data = df.isnull().sum()
+                    if missing_data.sum() > 0:
+                        st.warning(f"Total missing cells: {missing_data.sum()}")
+                        st.dataframe(missing_data[missing_data > 0])
+                    else:
+                        st.success("No missing values detected!")
+                
+                with q_col2:
+                    st.write("**Duplicates:**")
+                    duplicates = df.duplicated().sum()
+                    if duplicates > 0:
+                        st.warning(f"Found {duplicates} duplicate rows.")
+                    else:
+                        st.success("No duplicate rows detected!")
+                
+                st.write("**Column Data Types:**")
+                st.dataframe(df.dtypes.astype(str).to_frame(name="Data Type"))
         except Exception as e:
             st.error(f"Error reading file: {e}")
 
@@ -59,6 +85,21 @@ def main():
                 options=columns,
                 help="Choose the column you want the model to predict."
             )
+
+            # Target Variable Preview (Enhancement for Point B)
+            if target_column:
+                st.subheader(f"Target Variable Preview: {target_column}")
+                if ml_task == "Classification":
+                    # Show value counts/distribution
+                    counts = df[target_column].value_counts()
+                    st.bar_chart(counts)
+                    st.write("Class Distribution:")
+                    st.dataframe(counts)
+                else:
+                    # For regression, show summary stats or histogram
+                    st.write("Summary Statistics:")
+                    st.write(df[target_column].describe())
+                    st.line_chart(df[target_column].head(100)) # Simple line chart of first 100 values
         else:
             st.warning("Please upload a dataset first to select the target variable.")
 
