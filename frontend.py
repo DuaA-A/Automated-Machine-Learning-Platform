@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import io
+import requests
+import json
+import base64
 
 def main():
     st.set_page_config(page_title="Automated ML Platform", layout="centered")
@@ -61,23 +64,72 @@ def main():
 
     st.divider()
 
-    # Submission button (placeholder for further API integration)
+    # Submission button
     if st.button("Start Automated ML Pipeline", type="primary"):
         if df is None:
             st.error("Cannot start pipeline: No dataset uploaded.")
         elif ml_task in ["Classification", "Regression"] and target_column is None:
             st.error("Cannot start pipeline: Target variable must be selected for supervised learning.")
         else:
-            st.success("Configuration is fully set! Ready to send to backend API.")
-            
-            # --- Future Integration: Send this to the backend API ---
-            # payload = {
-            #     "task_type": ml_task,
-            #     "target_column": target_column,
-            # }
-            # # Also need to send the file/data
-            # response = requests.post("http://localhost:8000/api/train", files={"file": uploaded_file.getvalue()}, data=payload)
-            
+            with st.spinner("Training your model... This may take a moment."):
+                try:
+                    # Prepare the data for the API request
+                    # Reset pointer for the uploaded file
+                    uploaded_file.seek(0)
+                    files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+                    data = {
+                        "task_type": ml_task,
+                        "target_column": target_column if target_column else ""
+                    }
+
+                    # Call backend API (FastAPI)
+                    response = requests.post("http://localhost:8000/train", files=files, data=data)
+                    
+                    if response.status_code == 200:
+                        res = response.json()
+                        st.success(f"Pipeline completed successfully! Best Algorithm: {res['metrics']['algorithm']}")
+                        
+                        # F. Results & Export (Frontend)
+                        st.header("3. Model Evaluation Results")
+                        
+                        metrics_data = res['metrics']
+                        cols = st.columns(3)
+                        
+                        if ml_task == "Classification":
+                            cols[0].metric("Accuracy", f"{metrics_data['accuracy']:.4f}")
+                            cols[1].metric("Weighted F1", f"{metrics_data['f1_score']:.4f}")
+                            cols[2].metric("Precision", f"{metrics_data['precision']:.4f}")
+                            
+                            st.subheader("Confusion Matrix")
+                            st.write(pd.DataFrame(metrics_data['confusion_matrix']))
+                            
+                        elif ml_task == "Regression":
+                            cols[0].metric("MAE", f"{metrics_data['mae']:.4f}")
+                            cols[1].metric("MSE", f"{metrics_data['mse']:.4f}")
+                            cols[2].metric("R² Score", f"{metrics_data['r2_score']:.4f}")
+                            
+                        elif ml_task == "Clustering":
+                            cols[0].metric("Silhouette Score", f"{metrics_data['silhouette_score']:.4f}")
+
+                        # Model Export
+                        st.divider()
+                        st.subheader("4. Export Model")
+                        model_id = res['model_id']
+                        download_url = f"http://localhost:8000/download/{model_id}"
+                        
+                        if st.button("Download Trained Model (.joblib)"):
+                            model_response = requests.get(download_url)
+                            if model_response.status_code == 200:
+                                b64 = base64.b64encode(model_response.content).decode()
+                                href = f'<a href="data:application/octet-stream;base64,{b64}" download="model_{model_id}.joblib">Click here to download your model</a>'
+                                st.markdown(href, unsafe_allow_html=True)
+                            else:
+                                st.error("Failed to fetch model for download.")
+                    else:
+                        st.error(f"Backend Error: {response.json().get('detail', 'Unknown error')}")
+                except Exception as e:
+                    st.error(f"Error connecting to backend: {e}")
+                    st.info("Make sure the backend server is running at http://localhost:8000")
 
 if __name__ == "__main__":
     main()
