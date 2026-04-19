@@ -7,9 +7,6 @@ Cairo University, Faculty of Computer and Artificial Intelligence
 
 An end-to-end AutoML web application that allows non-technical users to upload a raw dataset, select a machine learning task, and receive a fully trained, evaluated, and downloadable model — without writing any code.
 
-> **Full documentation:** Open [`README.html`](README.html) in a browser for the complete styled project report.
-
----
 
 ## Quick Start
 
