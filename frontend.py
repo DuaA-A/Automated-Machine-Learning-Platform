@@ -39,7 +39,7 @@ def main():
                 st.dataframe(df.head())
 
                 # Dataset Quality Report (New Feature)
-                st.subheader("📊 Dataset Quality Report")
+                st.subheader("Dataset Quality Report")
                 
                 # Using columns for a cleaner layout
                 q_col1, q_col2 = st.columns(2)
@@ -60,6 +60,16 @@ def main():
                         st.warning(f"Found {duplicates} duplicate rows.")
                     else:
                         st.success("No duplicate rows detected!")
+                
+                # Scaling & Imbalance Check (New Enhancement)
+                st.write("**Scaling & Feature Analysis:**")
+                numeric_cols = df.select_dtypes(include=['number']).columns
+                if not numeric_cols.empty:
+                    ranges = df[numeric_cols].max() - df[numeric_cols].min()
+                    if ranges.max() / (ranges.min() + 1e-9) > 10:
+                        st.info("💡 **Scaling Recommended:** Numerical features have different scales. The backend will handle this automatically using StandardScaler.")
+                    else:
+                        st.success("Numerical features are within similar scales.")
                 
                 st.write("**Column Data Types:**")
                 st.dataframe(df.dtypes.astype(str).to_frame(name="Data Type"))
@@ -86,20 +96,26 @@ def main():
                 help="Choose the column you want the model to predict."
             )
 
-            # Target Variable Preview (Enhancement for Point B)
+            # Target Variable Preview & Imbalance Check
             if target_column:
                 st.subheader(f"Target Variable Preview: {target_column}")
                 if ml_task == "Classification":
-                    # Show value counts/distribution
                     counts = df[target_column].value_counts()
                     st.bar_chart(counts)
+                    
+                    # Imbalance Detection
+                    imbalance_ratio = counts.max() / counts.min()
+                    if imbalance_ratio > 1.5:
+                        st.warning(f"⚠️ **Imbalance Detected:** Imbalance ratio is {imbalance_ratio:.2f}. The backend will apply resampling to ensure fair training.")
+                    else:
+                        st.success("Target classes are well-balanced.")
+                    
                     st.write("Class Distribution:")
                     st.dataframe(counts)
                 else:
-                    # For regression, show summary stats or histogram
                     st.write("Summary Statistics:")
                     st.write(df[target_column].describe())
-                    st.line_chart(df[target_column].head(100)) # Simple line chart of first 100 values
+                    st.line_chart(df[target_column].head(100))
         else:
             st.warning("Please upload a dataset first to select the target variable.")
 
