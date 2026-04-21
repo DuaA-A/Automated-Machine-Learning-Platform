@@ -1,88 +1,26 @@
-# encoding.py
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from sklearn.compose import ColumnTransformer
 
+def get_encoder(X: pd.DataFrame, threshold: int = 15):
+    cat_cols = X.select_dtypes(include=['object', 'string', 'category', 'bool']).columns.tolist()
 
-def get_categorical_columns(X: pd.DataFrame) -> list:
-    # Include both 'object' and 'str' (pandas 2.x StringDtype) and 'category'/'bool'
-    return X.select_dtypes(include=['object', 'string', 'category', 'bool']).columns.tolist()
+    ohe_cols = [c for c in cat_cols if X[c].nunique() <= threshold]
+    ordinal_cols = [c for c in cat_cols if X[c].nunique() > threshold]
 
+    transformers = []
+    
+    if ohe_cols:
+        transformers.append(('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False), ohe_cols))
+    
+    if ordinal_cols:
+        transformers.append(('ordinal', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), ordinal_cols))
 
-# ─────────────────────────────────────────────────────────────
-# TECHNIQUE 1: OneHotEncoder
-# Creates a new binary column for each unique category value.
-# Example: city = [Cairo, Alex] → city_Cairo=1,0 | city_Alex=0,1
-# Best for: columns with FEW unique values (≤ 15)
-# ─────────────────────────────────────────────────────────────
-def encode_onehot(X: pd.DataFrame):
-    cat_cols = get_categorical_columns(X)
-    if not cat_cols:
-        return X.values, None
-    ct = ColumnTransformer(
-        transformers=[('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False), cat_cols)],
-        remainder='passthrough'
+    encoder = ColumnTransformer(
+        transformers=transformers, 
+        remainder='passthrough',
+        verbose_feature_names_out=False
     )
-    X_encoded = ct.fit_transform(X)
-    return X_encoded, ct
-
-
-# ─────────────────────────────────────────────────────────────
-# TECHNIQUE 2: LabelEncoder
-# Replaces each category with a single integer.
-# Example: city = [Cairo, Alex, Cairo] → [1, 0, 1]
-# Best for: columns with MANY unique values (> 15)
-# ─────────────────────────────────────────────────────────────
-def encode_label(X: pd.DataFrame):
-    cat_cols = get_categorical_columns(X)
-    X_encoded = X.copy()
-    encoders  = {}
-    for col in cat_cols:
-        le = LabelEncoder()
-        X_encoded[col] = le.fit_transform(X_encoded[col].astype(str))
-        encoders[col]  = le
-    return X_encoded.values, encoders
-
-
-# ─────────────────────────────────────────────────────────────
-# SMART AUTO SELECTOR — called by preprocessing.py
-# ohe_cols   : columns to encode with OneHotEncoder
-# label_cols : columns to encode with LabelEncoder
-# If not provided, auto-detects using threshold
-# ─────────────────────────────────────────────────────────────
-def auto_encode(X: pd.DataFrame,
-                threshold:  int  = 15,
-                ohe_cols:   list = None,
-                label_cols: list = None):
-    cat_cols = get_categorical_columns(X)
-
-    if ohe_cols is None:
-        ohe_cols   = [c for c in cat_cols if X[c].nunique() <= threshold]
-    if label_cols is None:
-        label_cols = [c for c in cat_cols if X[c].nunique() > threshold]
-
-    X_result       = X.copy()
-    label_encoders = {}
-
-    # Apply LabelEncoder first (in-place on DataFrame columns)
-    for col in label_cols:
-        if col in X_result.columns:
-            le = LabelEncoder()
-            X_result[col]  = le.fit_transform(X_result[col].astype(str))
-            label_encoders[col] = le
-
-    # Apply OneHotEncoder via ColumnTransformer
-    ohe_encoder = None
-    valid_ohe   = [c for c in ohe_cols if c in X_result.columns]
-
-    if valid_ohe:
-        ct = ColumnTransformer(
-            transformers=[('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False), valid_ohe)],
-            remainder='passthrough'
-        )
-        X_result    = ct.fit_transform(X_result)
-        ohe_encoder = ct
-    else:
-        X_result = X_result.values
-
-    return X_result, ohe_encoder, label_encoders
+    
+    encoder.set_output(transform='pandas')
+    return encoder
