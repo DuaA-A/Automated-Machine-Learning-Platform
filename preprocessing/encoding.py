@@ -1,20 +1,19 @@
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, FunctionTransformer
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 def get_encoder(X: pd.DataFrame, threshold: int = 15):
     # Select categorical-like columns
     cat_cols = X.select_dtypes(include=['object', 'string', 'category', 'bool']).columns.tolist()
 
     if not cat_cols:
-        from sklearn.preprocessing import FunctionTransformer
-        return FunctionTransformer(lambda x: x) # No-op if no categorical columns
+        return FunctionTransformer(lambda x: x, feature_names_out='one-to-one') # No-op if no categorical columns
 
     ohe_cols = [c for c in cat_cols if X[c].nunique() <= threshold]
     ordinal_cols = [c for c in cat_cols if X[c].nunique() > threshold]
 
     # Pre-step: Ensure all categorical columns are strings to avoid mixed-type errors (e.g. bool vs str)
-    from sklearn.preprocessing import FunctionTransformer
     def to_string(df):
         df = df.copy()
         for col in cat_cols:
@@ -37,9 +36,8 @@ def get_encoder(X: pd.DataFrame, threshold: int = 15):
     )
     
     # We return a pipeline that first converts to string, then encodes
-    from sklearn.pipeline import Pipeline
     encoder_pipeline = Pipeline([
-        ('to_str', FunctionTransformer(to_string)),
+        ('to_str', FunctionTransformer(to_string, feature_names_out='one-to-one')),
         ('encoder', ct)
     ])
     

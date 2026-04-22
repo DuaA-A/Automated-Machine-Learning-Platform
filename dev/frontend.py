@@ -97,7 +97,7 @@ def main():
     st.divider()
 
     # Execution
-    if st.button("Execute Pipeline", type="primary", use_container_width=True):
+    if st.button("Execute Pipeline", use_container_width=True):
         if df is None:
             st.error("Missing dataset.")
         elif ml_task in ["Classification", "Regression"] and target_column is None:
@@ -168,6 +168,17 @@ def main():
                                             index=[f"Cluster {i}" for i in range(len(centroids))]
                                         )
                                         st.dataframe(centroid_df, use_container_width=True)
+                                
+                                # ── New Professional Feature: 2D Cluster Visualization ──
+                                pca_data = metrics_data.get('pca_data')
+                                if pca_data:
+                                    st.write("2D Cluster Projection (PCA)")
+                                    viz_df = pd.DataFrame({
+                                        'Dimension 1': pca_data['x'],
+                                        'Dimension 2': pca_data['y'],
+                                        'Cluster': [f"Cluster {l}" for l in pca_data['labels']]
+                                    })
+                                    st.scatter_chart(viz_df, x='Dimension 1', y='Dimension 2', color='Cluster')
 
                         with tab2:
                             st.subheader("Automated Preprocessing Operations")

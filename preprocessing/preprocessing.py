@@ -76,16 +76,28 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
     encoding_details = {}
 
     encoder = feature_pipeline.named_steps.get('encoder', None)
-    if encoder:
-        for name, transformer, cols in encoder.transformers_:
+    
+    # Check if the encoder is wrapped in a Pipeline (needed for your encoding.py logic)
+    from sklearn.pipeline import Pipeline
+    actual_ct = None
+    if isinstance(encoder, Pipeline):
+        for _, step in encoder.steps:
+            if hasattr(step, 'transformers_'):
+                actual_ct = step
+                break
+    elif hasattr(encoder, 'transformers_'):
+        actual_ct = encoder
+
+    if actual_ct:
+        for name, transformer, cols in actual_ct.transformers_:
             if name == 'ohe':
                 ohe_columns = list(cols)
                 for c in cols:
-                    encoding_details[c] = {"technique": "OneHotEncoder", "new_cols": "Multiple"}
+                    encoding_details[c] = {"technique": "OneHotEncoder", "unique_count": X_train[c].nunique()}
             elif name == 'ordinal':
                 label_columns = list(cols)
                 for c in cols:
-                    encoding_details[c] = {"technique": "LabelEncoder", "new_cols": 1}
+                    encoding_details[c] = {"technique": "LabelEncoder", "unique_count": X_train[c].nunique()}
 
     scale_standard_cols = []
     scale_minmax_cols = []
