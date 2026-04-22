@@ -7,7 +7,7 @@ from sklearn import metrics
 from preprocessing.preprocessing import fit_preprocess, transform_test
 
 
-def train_regression(X, y):
+def train_regression(X, y, algorithm_choice="AutoML (Find Best Model)"):
     """
     Train regression models with no data leakage:
     1. Split into train/test FIRST
@@ -37,6 +37,9 @@ def train_regression(X, y):
         "Random Forest":     RandomForestRegressor(random_state=42),
         "Linear Regression": LinearRegression()
     }
+
+    if algorithm_choice != "AutoML (Find Best Model)" and algorithm_choice in algos:
+        algos = {algorithm_choice: algos[algorithm_choice]}
 
     for name, algo in algos.items():
         algo.fit(X_train_proc, y_train_proc)
