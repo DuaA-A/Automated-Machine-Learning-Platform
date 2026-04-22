@@ -1,86 +1,81 @@
 import pandas as pd
-from imblearn.pipeline import Pipeline
-from .cleaning import DropUselessColumns  
+from sklearn.pipeline import Pipeline as SklearnPipeline
+from .cleaning import DropUselessColumns
 from .imputation import get_imputer
 from .Scaling import get_scaler
 from .encoding import get_encoder
 from .imbalance import get_smote_object
 
+
 def clean_raw_data(df: pd.DataFrame):
     initial_rows = len(df)
-    
 
     df_cleaned = df.dropna(how='all')
-    
 
     df_cleaned = df_cleaned.drop_duplicates(keep='first')
-    
 
     rows_dropped = initial_rows - len(df_cleaned)
     report = {"duplicate_and_empty_rows_dropped": rows_dropped}
-    
-    return df_cleaned, report
-    
-def build_preprocessing_pipeline(X_train: pd.DataFrame, task: str):
 
+    return df_cleaned, report
+
+
+def _build_feature_pipeline(X_train: pd.DataFrame):
+    """Build and fit a sklearn pipeline (no SMOTE) on training data only."""
     steps = []
-    
 
     cleaner = DropUselessColumns()
     steps.append(('cleaner', cleaner))
-    
-
     X_tmp = cleaner.fit_transform(X_train)
-    
 
-    imputer = get_imputer(X_tmp) 
+    imputer = get_imputer(X_tmp)
     steps.append(('imputer', imputer))
     X_tmp = imputer.fit_transform(X_tmp)
-    
 
     scaler = get_scaler(X_tmp)
     steps.append(('scaler', scaler))
     X_tmp = scaler.fit_transform(X_tmp)
-    
 
     encoder = get_encoder(X_tmp)
     steps.append(('encoder', encoder))
-    X_tmp = encoder.fit_transform(X_tmp)
 
-    if str(task).lower() == "classification":
-        smote = get_smote_object(X_tmp)
-        steps.append(('smote', smote))
-
-    pipeline = Pipeline(steps=steps)
-    
+    pipeline = SklearnPipeline(steps=steps)
     return pipeline
 
-def preprocess(X: pd.DataFrame, y: pd.Series, task: str):
-    shape_before = list(X.shape)
-    
-    pipeline = build_preprocessing_pipeline(X, task)
-    
-    if str(task).lower() == "classification" and y is not None and not y.empty:
-        X_res, y_res = pipeline.fit_resample(X, y)
-    else:
-        # Pipeline from imblearn supports fit_transform if no resampling or not provided
-        X_res = pipeline.fit_transform(X, y)
-        y_res = y
 
-    shape_after = list(X_res.shape)
-    if hasattr(X_res, 'columns'):
-        columns_kept = list(X_res.columns)
-    else:
-        columns_kept = []
+def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
+    """
+    Fit the feature pipeline on training data ONLY and transform it.
+    For Classification, apply SMOTE only on the transformed training data.
+    Returns (fitted_pipeline, X_train_processed, y_train_processed, prep_info).
+    """
+    shape_before = list(X_train.shape)
 
-    # Try to extract info from pipeline
-    columns_dropped = getattr(pipeline.named_steps.get('cleaner', None), 'columns_to_drop_', [])
-    
+    # Fit feature pipeline on training data only (no SMOTE here)
+    feature_pipeline = _build_feature_pipeline(X_train)
+    X_transformed = feature_pipeline.fit_transform(X_train)
+    y_processed = y_train
+
+    # Apply SMOTE separately, only on training data
+    if str(task).lower() == "classification" and y_train is not None and not y_train.empty:
+        smote = get_smote_object(X_transformed)
+        X_processed, y_processed = smote.fit_resample(X_transformed, y_train)
+    else:
+        X_processed = X_transformed
+
+    shape_after = list(X_processed.shape)
+    columns_kept = list(X_processed.columns) if hasattr(X_processed, 'columns') else []
+
+    # Extract info from pipeline
+    columns_dropped = getattr(
+        feature_pipeline.named_steps.get('cleaner', None), 'columns_to_drop_', []
+    )
+
     ohe_columns = []
     label_columns = []
     encoding_details = {}
-    
-    encoder = pipeline.named_steps.get('encoder', None)
+
+    encoder = feature_pipeline.named_steps.get('encoder', None)
     if encoder:
         for name, transformer, cols in encoder.transformers_:
             if name == 'ohe':
@@ -91,12 +86,12 @@ def preprocess(X: pd.DataFrame, y: pd.Series, task: str):
                 label_columns = list(cols)
                 for c in cols:
                     encoding_details[c] = {"technique": "LabelEncoder", "new_cols": 1}
-                    
+
     scale_standard_cols = []
     scale_minmax_cols = []
     scaling_details = {}
-    
-    scaler = pipeline.named_steps.get('scaler', None)
+
+    scaler = feature_pipeline.named_steps.get('scaler', None)
     if scaler:
         for name, transformer, cols in scaler.transformers_:
             if name == 'std_scaler':
@@ -120,11 +115,19 @@ def preprocess(X: pd.DataFrame, y: pd.Series, task: str):
         "scale_minmax_cols": scale_minmax_cols,
         "scaling_details": scaling_details
     }
-    
-    return X_res, y_res, prep_info
+
+    return feature_pipeline, X_processed, y_processed, prep_info
+
+
+def transform_test(feature_pipeline, X_test: pd.DataFrame):
+    """
+    Apply an already-fitted feature pipeline to test data.
+    No SMOTE is applied here — only transformations.
+    """
+    return feature_pipeline.transform(X_test)
+
 
 def get_serializable_info(prep_info: dict) -> dict:
-    import builtins
     safe_info = {}
     for k, v in prep_info.items():
         if isinstance(v, list):

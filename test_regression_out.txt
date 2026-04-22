@@ -1,0 +1,69 @@
+Status: 200
+JSON Output: {
+  "status": "success",
+  "model_id": "8d7af182-fffb-4c1b-b239-eb29648b2917",
+  "metrics": {
+    "algorithm": "Linear Regression",
+    "mae": 8174.583600006566,
+    "mse": 101434798.50563514,
+    "r2_score": 0.9984263636823413
+  },
+  "task_type": "Regression",
+  "preprocessing_info": {
+    "columns_dropped": [],
+    "columns_kept": [
+      "Square_Footage",
+      "Year_Built",
+      "Num_Bedrooms",
+      "Num_Bathrooms",
+      "Lot_Size",
+      "Garage_Size",
+      "Neighborhood_Quality"
+    ],
+    "shape_before_encoding": [
+      "1000",
+      "7"
+    ],
+    "shape_after_encoding": [
+      "1000",
+      "7"
+    ],
+    "ohe_columns": [],
+    "label_columns": [],
+    "encoding_details": {},
+    "scale_standard_cols": [
+      "Square_Footage",
+      "Year_Built"
+    ],
+    "scale_minmax_cols": [
+      "Num_Bedrooms",
+      "Num_Bathrooms",
+      "Lot_Size",
+      "Garage_Size",
+      "Neighborhood_Quality"
+    ],
+    "scaling_details": {
+      "Square_Footage": {
+        "technique": "StandardScaler"
+      },
+      "Year_Built": {
+        "technique": "StandardScaler"
+      },
+      "Num_Bedrooms": {
+        "technique": "MinMaxScaler"
+      },
+      "Num_Bathrooms": {
+        "technique": "MinMaxScaler"
+      },
+      "Lot_Size": {
+        "technique": "MinMaxScaler"
+      },
+      "Garage_Size": {
+        "technique": "MinMaxScaler"
+      },
+      "Neighborhood_Quality": {
+        "technique": "MinMaxScaler"
+      }
+    }
+  }
+}
