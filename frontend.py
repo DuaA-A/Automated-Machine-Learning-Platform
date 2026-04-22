@@ -65,6 +65,7 @@ def main():
     ml_task = st.radio("Select the Machine Learning Problem Type:",
                         ("Classification", "Regression", "Clustering"))
     target_column = None
+    algorithm_choice = "AutoML (Find Best Model)"
 
     if ml_task in ["Classification", "Regression"]:
         if df is not None:
@@ -87,6 +88,17 @@ def main():
         else:
             st.warning("Please upload a dataset first.")
 
+    st.subheader("Algorithm Selection")
+    if ml_task == "Classification":
+        algorithm_choice = st.radio("Select Algorithm:", 
+            ("AutoML (Find Best Model)", "Random Forest", "Logistic Regression", "Support Vector Machine", "Gradient Boosting", "K-Nearest Neighbors"))
+    elif ml_task == "Regression":
+        algorithm_choice = st.radio("Select Algorithm:", 
+            ("AutoML (Find Best Model)", "Random Forest", "Linear Regression"))
+    elif ml_task == "Clustering":
+        algorithm_choice = st.radio("Select Algorithm:", 
+            ("AutoML (Find Best Model)", "K-Means", "Agglomerative"))
+
     st.divider()
 
     # ── Start Pipeline ───────────────────────────────────────────
@@ -103,7 +115,8 @@ def main():
                         "http://localhost:8000/train",
                         files={"file": (uploaded_file.name, uploaded_file.getvalue())},
                         data={"task_type": ml_task,
-                              "target_column": target_column if target_column else ""}
+                              "target_column": target_column if target_column else "",
+                              "algorithm_choice": algorithm_choice}
                     )
 
                     if response.status_code == 200:

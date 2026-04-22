@@ -22,7 +22,8 @@ models_db = {}
 async def train_model(
     file: UploadFile = File(...),
     task_type: str = Form(...),
-    target_column: str = Form(None)
+    target_column: str = Form(None),
+    algorithm_choice: str = Form("AutoML (Find Best Model)")
 ):
     try:
         # ── 1. Load Data ─────────────────────────────────────────
@@ -54,7 +55,7 @@ async def train_model(
         # ── 3. Train (preprocessing + model selection happen inside) ──
         # Splitting, preprocessing, SMOTE, and model training all happen
         # inside the training module — no leakage possible from here.
-        best_model, results, prep_info = train_and_evaluate(X, y, task_type)
+        best_model, results, prep_info = train_and_evaluate(X, y, task_type, algorithm_choice)
 
         safe_prep_info = get_serializable_info(prep_info)
 
