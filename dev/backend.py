@@ -5,9 +5,13 @@ import joblib
 import io
 import os
 import uuid
+import logging
 
 from training import train_and_evaluate
 from preprocessing.preprocessing import get_serializable_info
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -26,47 +30,70 @@ async def train_model(
     algorithm_choice: str = Form("AutoML (Find Best Model)")
 ):
     try:
-        # ── 1. Load Data ─────────────────────────────────────────
+        
+        logger.info("Step 1: Starting Data Loading...")
         contents = await file.read()
         if file.filename.endswith('.csv'):
+            logger.info("Parsing CSV file format.")
             df = pd.read_csv(io.BytesIO(contents))
         elif file.filename.endswith('.xlsx'):
+            logger.info("Parsing Excel file format.")
             df = pd.read_excel(io.BytesIO(contents))
         else:
+            logger.error("Unsupported file format provided.")
             raise HTTPException(status_code=400, detail="Unsupported file format")
 
         if df.empty:
+            logger.error("Dataset is empty after parsing.")
             raise HTTPException(status_code=400, detail="Dataset is empty")
 
-        # ── 2. Basic Cleaning (Duplicates & Empty Rows) ──────────
+        logger.info(f"Data successfully loaded. Shape: {df.shape}")
+
+
+        logger.info("Step 2: Basic Cleaning (Duplicates & Empty Rows)...")
         from preprocessing.preprocessing import clean_raw_data
         df, clean_report = clean_raw_data(df)
+        logger.info(f"Data shape after basic cleaning: {df.shape}")
 
-        # ── 3. Separate features (X) and target (y) ──────────────
+
+        logger.info(f"Step 3: Separating features (X) and target (y). Task Type: {task_type}")
         X = df.copy()
         y = None
 
         if task_type in ["Classification", "Regression"]:
             if not target_column or target_column not in df.columns:
+                logger.error(f"Target column '{target_column}' not found.")
                 raise HTTPException(status_code=400, detail="Target column not found")
             y = X[target_column]
             X = X.drop(columns=[target_column])
+            logger.info(f"Target column '{target_column}' extracted successfully.")
 
-        # ── 3. Train (preprocessing + model selection happen inside) ──
-        # Splitting, preprocessing, SMOTE, and model training all happen
-        # inside the training module — no leakage possible from here.
+            if task_type == "Regression" and not pd.api.types.is_numeric_dtype(y):
+                logger.error(f"Regression task requires a numeric target, but got categorical for '{target_column}'.")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Target column '{target_column}' contains non-numeric data. Regression models require a numeric target variable. Did you mean to use Classification?"
+                )
+
+ 
+        logger.info(f"Step 4: Commencing Training Pipeline with Algorithm Choice: {algorithm_choice}...")
+
         best_model, results, prep_info = train_and_evaluate(X, y, task_type, algorithm_choice)
+        logger.info(f"Training Pipeline Completed. Best Model Algorithm: {results.get('algorithm', 'Unknown')}")
 
         safe_prep_info = get_serializable_info(prep_info)
 
-        # ── 4. Save Best Model ────────────────────────────────────
+
+        logger.info("Step 5: Saving the best model to disk...")
         model_id   = str(uuid.uuid4())
         model_path = os.path.join(MODELS_DIR, f"{model_id}.joblib")
         joblib.dump({"model": best_model, "prep_info": safe_prep_info,
                      "task_type": task_type}, model_path)
         models_db[model_id] = model_path
+        logger.info(f"Model successfully saved with ID: {model_id}")
 
-        # ── 5. Return Response ────────────────────────────────────
+
+        logger.info("Returning processing results to the client.")
         return {
             "status":             "success",
             "model_id":           model_id,

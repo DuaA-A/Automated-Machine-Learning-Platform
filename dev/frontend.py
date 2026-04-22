@@ -78,8 +78,14 @@ def main():
     if ml_task in ["Classification", "Regression"]:
         if df is not None:
             with t2:
-                target_column = st.selectbox("Target Column",
-                                              options=df.columns.tolist())
+                if ml_task == "Regression":
+                    valid_cols = df.select_dtypes(include=['number']).columns.tolist()
+                    if not valid_cols:
+                        st.warning("No numerical columns found for Regression.")
+                    target_column = st.selectbox("Target Column", options=valid_cols)
+                else:
+                    target_column = st.selectbox("Target Column",
+                                                  options=df.columns.tolist())
         else:
             st.info("Dataset required for column selection.")
 
@@ -89,7 +95,7 @@ def main():
             ("AutoML (Find Best Model)", "Random Forest", "Gradient Boosting"), horizontal=True)
     elif ml_task == "Regression":
         algorithm_choice = st.radio("Algorithm", 
-            ("AutoML (Find Best Model)", "Random Forest", "Linear Regression"), horizontal=True)
+            ("AutoML (Find Best Model)", "Random Forest", "Ridge Regression"), horizontal=True)
     elif ml_task == "Clustering":
         algorithm_choice = st.radio("Algorithm", 
             ("AutoML (Find Best Model)", "K-Means", "Agglomerative"), horizontal=True)
