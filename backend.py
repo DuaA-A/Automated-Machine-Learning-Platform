@@ -37,7 +37,11 @@ async def train_model(
         if df.empty:
             raise HTTPException(status_code=400, detail="Dataset is empty")
 
-        # ── 2. Separate features (X) and target (y) ──────────────
+        # ── 2. Basic Cleaning (Duplicates & Empty Rows) ──────────
+        from preprocessing.preprocessing import clean_raw_data
+        df, clean_report = clean_raw_data(df)
+
+        # ── 3. Separate features (X) and target (y) ──────────────
         X = df.copy()
         y = None
 

@@ -20,13 +20,13 @@ def clean_raw_data(df: pd.DataFrame):
     return df_cleaned, report
 
 
-def _build_feature_pipeline(X_train: pd.DataFrame):
+def _build_feature_pipeline(X_train: pd.DataFrame, y_train: pd.Series = None):
     """Build and fit a sklearn pipeline (no SMOTE) on training data only."""
     steps = []
 
     cleaner = DropUselessColumns()
     steps.append(('cleaner', cleaner))
-    X_tmp = cleaner.fit_transform(X_train)
+    X_tmp = cleaner.fit_transform(X_train, y_train)
 
     imputer = get_imputer(X_tmp)
     steps.append(('imputer', imputer))
@@ -52,8 +52,8 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
     shape_before = list(X_train.shape)
 
     # Fit feature pipeline on training data only (no SMOTE here)
-    feature_pipeline = _build_feature_pipeline(X_train)
-    X_transformed = feature_pipeline.fit_transform(X_train)
+    feature_pipeline = _build_feature_pipeline(X_train, y_train)
+    X_transformed = feature_pipeline.fit_transform(X_train, y_train)
     y_processed = y_train
 
     # Apply SMOTE separately, only on training data

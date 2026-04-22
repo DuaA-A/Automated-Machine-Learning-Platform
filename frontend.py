@@ -230,7 +230,12 @@ def main():
                             c[1].metric("Weighted F1", f"{metrics_data['f1_score']:.4f}")
                             c[2].metric("Precision",   f"{metrics_data['precision']:.4f}")
                             st.subheader("Confusion Matrix")
-                            st.dataframe(pd.DataFrame(metrics_data['confusion_matrix']))
+                            cm_df = pd.DataFrame(
+                                metrics_data['confusion_matrix'],
+                                index=[f"Actual: {c}" for c in metrics_data.get('class_labels', [])],
+                                columns=[f"Predicted: {c}" for c in metrics_data.get('class_labels', [])]
+                            )
+                            st.dataframe(cm_df, use_container_width=True)
 
                         elif ml_task == "Regression":
                             c[0].metric("MAE",      f"{metrics_data['mae']:.4f}")
