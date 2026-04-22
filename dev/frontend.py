@@ -8,7 +8,7 @@ def main():
     st.title("Automated Machine Learning Platform")
     st.write("An integrated system for dataset analysis and automated model training.")
 
-    # Section 1: Data Ingestion
+
     st.header("1. Data Ingestion")
     with st.container():
         uploaded_file = st.file_uploader("Upload Dataset", type=["csv", "xlsx"])
@@ -65,7 +65,7 @@ def main():
             except Exception as e:
                 st.error(f"Error during ingestion: {e}")
 
-    # Section 2: Configuration
+
     st.header("2. Configuration")
     t1, t2 = st.columns(2)
     with t1:
@@ -102,7 +102,7 @@ def main():
 
     st.divider()
 
-    # Execution
+
     if st.button("Execute Pipeline", use_container_width=True):
         if df is None:
             st.error("Missing dataset.")
@@ -127,7 +127,7 @@ def main():
 
                         st.success(f"Processing Complete: {metrics_data['algorithm']}")
 
-                        # Structured Results
+
                         tab1, tab2, tab3 = st.tabs(["Evaluation Metrics", "Preprocessing Log", "Model Artifacts"])
 
                         with tab1:
@@ -175,7 +175,7 @@ def main():
                                         )
                                         st.dataframe(centroid_df, use_container_width=True)
                                 
-                                # ── New Professional Feature: 2D Cluster Visualization ──
+
                                 pca_data = metrics_data.get('pca_data')
                                 if pca_data:
                                     st.write("2D Cluster Projection (PCA)")
