@@ -1,5 +1,8 @@
 import pandas as pd
+import logging
 from sklearn.pipeline import Pipeline as SklearnPipeline
+
+logger = logging.getLogger(__name__)
 from .cleaning import DropUselessColumns
 from .imputation import get_imputer
 from .Scaling import get_scaler
@@ -8,11 +11,14 @@ from .imbalance import get_smote_object
 
 
 def clean_raw_data(df: pd.DataFrame):
+    logger.info("Preprocessing: Starting clean_raw_data...")
     initial_rows = len(df)
 
     df_cleaned = df.dropna(how='all')
+    logger.info(f"Preprocessing: Dropped completely empty rows. Remaining: {len(df_cleaned)}")
 
     df_cleaned = df_cleaned.drop_duplicates(keep='first')
+    logger.info(f"Preprocessing: Dropped duplicate rows. Remaining: {len(df_cleaned)}")
 
     rows_dropped = initial_rows - len(df_cleaned)
     report = {"duplicate_and_empty_rows_dropped": rows_dropped}
@@ -20,53 +26,71 @@ def clean_raw_data(df: pd.DataFrame):
     return df_cleaned, report
 
 
-def _build_feature_pipeline(X_train: pd.DataFrame, y_train: pd.Series = None):
-    """Build and fit a sklearn pipeline (no SMOTE) on training data only."""
+def _build_feature_pipeline(X_train: pd.DataFrame, y_train: pd.Series = None, task: str = None):
+
+    logger.info("Preprocessing: Building feature pipeline...")
     steps = []
 
-    cleaner = DropUselessColumns()
+    cleaner = DropUselessColumns(task=task)
     steps.append(('cleaner', cleaner))
+    logger.info("Preprocessing: Fitting DropUselessColumns...")
     X_tmp = cleaner.fit_transform(X_train, y_train)
 
     imputer = get_imputer(X_tmp)
     steps.append(('imputer', imputer))
+    logger.info("Preprocessing: Fitting Imputer...")
     X_tmp = imputer.fit_transform(X_tmp)
 
     scaler = get_scaler(X_tmp)
     steps.append(('scaler', scaler))
+    logger.info("Preprocessing: Fitting Scaler...")
     X_tmp = scaler.fit_transform(X_tmp)
 
     encoder = get_encoder(X_tmp)
     steps.append(('encoder', encoder))
+    logger.info("Preprocessing: Adding Encoder to pipeline...")
 
     pipeline = SklearnPipeline(steps=steps)
+    logger.info("Preprocessing: Feature pipeline built successfully.")
     return pipeline
 
 
 def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
-    """
-    Fit the feature pipeline on training data ONLY and transform it.
-    For Classification, apply SMOTE only on the transformed training data.
-    Returns (fitted_pipeline, X_train_processed, y_train_processed, prep_info).
-    """
+
+    logger.info(f"Preprocessing: Starting fit_preprocess for task '{task}'. Initial shape: {X_train.shape}")
     shape_before = list(X_train.shape)
 
-    # Fit feature pipeline on training data only (no SMOTE here)
-    feature_pipeline = _build_feature_pipeline(X_train, y_train)
+
+    feature_pipeline = _build_feature_pipeline(X_train, y_train, task=task)
+    logger.info("Preprocessing: Transforming training data with feature pipeline...")
     X_transformed = feature_pipeline.fit_transform(X_train, y_train)
     y_processed = y_train
+    smote_applied = False
 
-    # Apply SMOTE separately, only on training data
     if str(task).lower() == "classification" and y_train is not None and not y_train.empty:
-        smote = get_smote_object(X_transformed)
-        X_processed, y_processed = smote.fit_resample(X_transformed, y_train)
+        class_counts = y_train.value_counts(dropna=True)
+        if class_counts.sum() > 0:
+            min_class_ratio = class_counts.min() / class_counts.sum()
+        else:
+            min_class_ratio = 1.0
+
+        if len(class_counts) > 1 and min_class_ratio < 0.20:
+            logger.info(f"Preprocessing: Class imbalance detected (minority ratio={min_class_ratio:.2f}). Applying SMOTE...")
+            smote = get_smote_object(X_transformed)
+            X_processed, y_processed = smote.fit_resample(X_transformed, y_train)
+            smote_applied = True
+            logger.info(f"Preprocessing: SMOTE applied. Shape after resampling: {X_processed.shape}")
+        else:
+            logger.info(f"Preprocessing: Classes are balanced (minority ratio={min_class_ratio:.2f}). Skipping SMOTE.")
+            X_processed = X_transformed
+            y_processed = y_train
     else:
+        logger.info("Preprocessing: Skipping SMOTE (not a classification task or empty target).")
         X_processed = X_transformed
 
     shape_after = list(X_processed.shape)
     columns_kept = list(X_processed.columns) if hasattr(X_processed, 'columns') else []
 
-    # Extract info from pipeline
     columns_dropped = getattr(
         feature_pipeline.named_steps.get('cleaner', None), 'columns_to_drop_', []
     )
@@ -77,7 +101,6 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
 
     encoder = feature_pipeline.named_steps.get('encoder', None)
     
-    # Check if the encoder is wrapped in a Pipeline (needed for your encoding.py logic)
     from sklearn.pipeline import Pipeline
     actual_ct = None
     if isinstance(encoder, Pipeline):
@@ -116,6 +139,7 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
                     scaling_details[c] = {"technique": "MinMaxScaler"}
 
     prep_info = {
+        "smote_applied": smote_applied,
         "columns_dropped": columns_dropped,
         "columns_kept": columns_kept,
         "shape_before_encoding": shape_before,
@@ -132,10 +156,6 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
 
 
 def transform_test(feature_pipeline, X_test: pd.DataFrame):
-    """
-    Apply an already-fitted feature pipeline to test data.
-    No SMOTE is applied here — only transformations.
-    """
     return feature_pipeline.transform(X_test)
 
 

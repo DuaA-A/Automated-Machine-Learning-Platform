@@ -11,3 +11,4 @@ IS424_Project Requirements-3.pdf
 *.pkl
 *.joblib
 .streamlit/
+Ex_data/*.csv

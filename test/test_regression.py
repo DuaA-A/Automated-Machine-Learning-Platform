@@ -1,11 +1,16 @@
 import json
 from fastapi.testclient import TestClient
-from backend import app
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from dev.backend import app
 
 client = TestClient(app)
 
 def test_regression():
-    file_path = 'house_price_regression_dataset.csv'
+    file_path = os.path.join(os.path.dirname(__file__), '..', 'Ex_data', 'house_price_regression_dataset.csv')
     with open(file_path, 'rb') as f:
         response = client.post(
             "/train",

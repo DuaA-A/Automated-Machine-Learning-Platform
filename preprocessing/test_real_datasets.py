@@ -1,10 +1,12 @@
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import sklearn
+from imblearn.pipeline import Pipeline
 import pandas as pd
 import numpy as np
-from preprocessing.preprocessing import build_preprocessing_pipeline, clean_raw_data 
+from preprocessing.preprocessing import fit_preprocess, clean_raw_data 
+sklearn.set_config(transform_output="pandas")
 
 def test_pipeline_on_dataset(file_name, target_col, task_type):
     print("\n" + "=" * 70)
@@ -14,7 +16,8 @@ def test_pipeline_on_dataset(file_name, target_col, task_type):
 
     try:
 
-        df = pd.read_csv(file_name)
+        file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Ex_data', file_name)
+        df = pd.read_csv(file_path)
         
 
         df, cleaning_report = clean_raw_data(df)
@@ -32,22 +35,8 @@ def test_pipeline_on_dataset(file_name, target_col, task_type):
         print(f"    Missing Values: {X.isna().sum().sum()}")
 
 
-        pipeline = build_preprocessing_pipeline(X_train=X, task=task_type)
-        print("\n[2] Pipeline built successfully.")
-
-
-        print("[3] Running pipeline execution... (this may take a few seconds)")
-        
-        if task_type == 'Classification':
-            pipe_up_to_smote = pipeline[:-1] 
-            X_resampled, y_processed = pipe_up_to_smote.fit_resample(X, y)
-            encoder = pipeline.named_steps['encoder']
-            X_processed = encoder.fit_transform(X_resampled)
-            
-        else:
-
-            X_processed = pipeline.fit_transform(X)
-            y_processed = y
+        print("[2/3] Running pipeline execution... (this may take a few seconds)")
+        feature_pipeline, X_processed, y_processed, prep_info = fit_preprocess(X, y, task=task_type)
         
 
         if not isinstance(X_processed, pd.DataFrame):
