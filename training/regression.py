@@ -10,8 +10,8 @@ from sklearn import metrics
 from preprocessing.preprocessing import fit_preprocess, transform_test
 
 
-def train_regression(X, y, algorithm_choice="AutoML (Find Best Model)"):
-    logger.info(f"Training (Regression): Starting train_regression with algorithm_choice='{algorithm_choice}'...")
+def train_regression(X, y):
+    logger.info("Training (Regression): Starting train_regression...")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -48,8 +48,7 @@ def train_regression(X, y, algorithm_choice="AutoML (Find Best Model)"):
         }
     }
 
-    if algorithm_choice != "AutoML (Find Best Model)" and algorithm_choice in algos:
-        algos = {algorithm_choice: algos[algorithm_choice]}
+
 
     for name, algo in algos.items():
         logger.info(f"Training (Regression): Starting RandomizedSearchCV for {name}...")

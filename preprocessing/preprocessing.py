@@ -65,12 +65,25 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
     logger.info("Preprocessing: Transforming training data with feature pipeline...")
     X_transformed = feature_pipeline.fit_transform(X_train, y_train)
     y_processed = y_train
+    smote_applied = False
 
     if str(task).lower() == "classification" and y_train is not None and not y_train.empty:
-        logger.info("Preprocessing: Applying SMOTE to handle class imbalance...")
-        smote = get_smote_object(X_transformed)
-        X_processed, y_processed = smote.fit_resample(X_transformed, y_train)
-        logger.info(f"Preprocessing: SMOTE applied. Shape after resampling: {X_processed.shape}")
+        class_counts = y_train.value_counts(dropna=True)
+        if class_counts.sum() > 0:
+            min_class_ratio = class_counts.min() / class_counts.sum()
+        else:
+            min_class_ratio = 1.0
+
+        if len(class_counts) > 1 and min_class_ratio < 0.20:
+            logger.info(f"Preprocessing: Class imbalance detected (minority ratio={min_class_ratio:.2f}). Applying SMOTE...")
+            smote = get_smote_object(X_transformed)
+            X_processed, y_processed = smote.fit_resample(X_transformed, y_train)
+            smote_applied = True
+            logger.info(f"Preprocessing: SMOTE applied. Shape after resampling: {X_processed.shape}")
+        else:
+            logger.info(f"Preprocessing: Classes are balanced (minority ratio={min_class_ratio:.2f}). Skipping SMOTE.")
+            X_processed = X_transformed
+            y_processed = y_train
     else:
         logger.info("Preprocessing: Skipping SMOTE (not a classification task or empty target).")
         X_processed = X_transformed
@@ -126,6 +139,7 @@ def fit_preprocess(X_train: pd.DataFrame, y_train: pd.Series, task: str):
                     scaling_details[c] = {"technique": "MinMaxScaler"}
 
     prep_info = {
+        "smote_applied": smote_applied,
         "columns_dropped": columns_dropped,
         "columns_kept": columns_kept,
         "shape_before_encoding": shape_before,

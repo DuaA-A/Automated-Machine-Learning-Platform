@@ -26,8 +26,7 @@ models_db = {}
 async def train_model(
     file: UploadFile = File(...),
     task_type: str = Form(...),
-    target_column: str = Form(None),
-    algorithm_choice: str = Form("AutoML (Find Best Model)")
+    target_column: str = Form(None)
 ):
     try:
         
@@ -76,9 +75,9 @@ async def train_model(
                 )
 
  
-        logger.info(f"Step 4: Commencing Training Pipeline with Algorithm Choice: {algorithm_choice}...")
+        logger.info("Step 4: Commencing Training Pipeline...")
 
-        best_model, results, prep_info = train_and_evaluate(X, y, task_type, algorithm_choice)
+        best_model, results, prep_info = train_and_evaluate(X, y, task_type)
         logger.info(f"Training Pipeline Completed. Best Model Algorithm: {results.get('algorithm', 'Unknown')}")
 
         safe_prep_info = get_serializable_info(prep_info)

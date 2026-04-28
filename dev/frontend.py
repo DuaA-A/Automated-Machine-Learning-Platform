@@ -73,7 +73,6 @@ def main():
                             ("Classification", "Regression", "Clustering"), horizontal=True)
     
     target_column = None
-    algorithm_choice = "AutoML (Find Best Model)"
 
     if ml_task in ["Classification", "Regression"]:
         if df is not None:
@@ -89,16 +88,26 @@ def main():
         else:
             st.info("Dataset required for column selection.")
 
-    st.subheader("Model Selection")
-    if ml_task == "Classification":
-        algorithm_choice = st.radio("Algorithm", 
-            ("AutoML (Find Best Model)", "Random Forest", "Gradient Boosting"), horizontal=True)
-    elif ml_task == "Regression":
-        algorithm_choice = st.radio("Algorithm", 
-            ("AutoML (Find Best Model)", "Random Forest", "Ridge Regression"), horizontal=True)
-    elif ml_task == "Clustering":
-        algorithm_choice = st.radio("Algorithm", 
-            ("AutoML (Find Best Model)", "K-Means", "Agglomerative"), horizontal=True)
+    if ml_task == "Classification" and df is not None and target_column:
+        if st.button("Analyze Target Distribution"):
+            st.subheader("Target Distribution Analysis")
+            class_counts = df[target_column].value_counts(dropna=True)
+            total_samples = class_counts.sum()
+            if total_samples > 0 and len(class_counts) > 1:
+                min_class_ratio = class_counts.min() / total_samples
+                
+                col_chart, col_msg = st.columns([2, 1])
+                with col_chart:
+                    st.bar_chart(class_counts)
+                with col_msg:
+                    st.write("**Class Counts:**")
+                    st.dataframe(class_counts.rename("Count"), use_container_width=True)
+                    if min_class_ratio < 0.20:
+                        st.warning(f"⚠️ **Class Imbalance Detected!** The minority class is only {min_class_ratio*100:.1f}% of the data. The backend will automatically apply SMOTE to balance the classes.")
+                    else:
+                        st.success(f"✅ **Balanced Classes.** The minority class is {min_class_ratio*100:.1f}% of the data. No severe imbalance detected.")
+            elif len(class_counts) <= 1:
+                st.error("Target column must have more than 1 class for Classification.")
 
     st.divider()
 
@@ -116,8 +125,7 @@ def main():
                         "http://localhost:8000/train",
                         files={"file": (uploaded_file.name, uploaded_file.getvalue())},
                         data={"task_type": ml_task,
-                              "target_column": target_column if target_column else "",
-                              "algorithm_choice": algorithm_choice}
+                              "target_column": target_column if target_column else ""}
                     )
 
                     if response.status_code == 200:
@@ -189,6 +197,13 @@ def main():
                         with tab2:
                             st.subheader("Automated Preprocessing Operations")
                             
+                            smote_applied = prep.get("smote_applied")
+                            if smote_applied is not None:
+                                if smote_applied:
+                                    st.success("🔄 **Class Balancing (SMOTE):** Applied to handle minority class imbalance.")
+                                else:
+                                    st.info("ℹ️ **Class Balancing (SMOTE):** Not applied (classes were already balanced or not a classification task).")
+
                             dropped = prep.get("columns_dropped", [])
                             if dropped:
                                 st.write(f"Removed Columns: {len(dropped)}")
